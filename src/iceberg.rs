@@ -1,25 +1,26 @@
-pub struct Snapshot {
-    pub id: u64,
-    pub timestamp: i64,
-    pub manifest_list: Vec<String>,
-}
+use anyhow::Result;
+use std::fs;
+use std::path::Path;
 
-pub struct Table {
+pub struct IcebergTable {
     pub name: String,
     pub location: String,
-    pub current_snapshot: Option<Snapshot>,
 }
 
-impl Table {
-    pub fn new(name: &str, location: &str) -> Self {
-        Table {
-            name: name.to_string(),
-            location: location.to_string(),
-            current_snapshot: None,
-        }
+impl IcebergTable {
+    pub fn load(name: &str, location: &str) -> Result<Self> {
+        Ok(Self { name: name.to_string(), location: location.to_string() })
     }
 
-    pub fn add_snapshot(&mut self, snapshot: Snapshot) {
-        self.current_snapshot = Some(snapshot);
+    pub fn parquet_files(&self) -> Result<Vec<String>> {
+        let mut files = Vec::new();
+        let data_dir = Path::new(&self.location).join("data");
+        for entry in fs::read_dir(&data_dir)? {
+            let path = entry?.path();
+            if path.extension().map(|e| e == "parquet").unwrap_or(false) {
+                files.push(path.to_string_lossy().to_string());
+            }
+        }
+        Ok(files)
     }
 }

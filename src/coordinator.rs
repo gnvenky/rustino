@@ -1,4 +1,5 @@
 use crate::worker::Worker;
+use datafusion::arrow::record_batch::RecordBatch;
 
 pub struct Coordinator {
     worker: Worker,
@@ -9,7 +10,7 @@ impl Coordinator {
         Self { worker }
     }
 
-    pub async fn execute_query(&self, sql: &str) {
-        self.worker.run_query(sql).await;
+    pub async fn execute_query(&self, batches: Vec<RecordBatch>) {
+        self.worker.execute(batches).await;
     }
 }

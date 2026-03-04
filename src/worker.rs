@@ -1,19 +1,16 @@
-use crate::engine::Engine;
+use datafusion::arrow::record_batch::RecordBatch;
 
 pub struct Worker {
-    engine: Engine,
+    pub id: String,
 }
 
 impl Worker {
-    pub fn new(engine: Engine) -> Self {
-        Self { engine }
+    pub fn new(id: &str) -> Self {
+        Self { id: id.to_string() }
     }
 
-    pub async fn run_query(&self, sql: &str) {
-        let results = self.engine.execute_sql(sql).await.unwrap();
-
-        for batch in results {
-            println!("{:?}", batch);
-        }
+    pub async fn execute(&self, batches: Vec<RecordBatch>) -> Vec<RecordBatch> {
+        println!("Worker {} processing {} batches", self.id, batches.len());
+        batches
     }
 }

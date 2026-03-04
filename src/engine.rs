@@ -1,32 +1,31 @@
 use datafusion::prelude::*;
-use arrow::record_batch::RecordBatch;
+use datafusion::arrow::record_batch::RecordBatch;
 
 pub struct Engine {
-    ctx: SessionContext,
+    pub ctx: SessionContext,
 }
 
 impl Engine {
     pub fn new() -> Self {
-        let ctx = SessionContext::new();
-        Self { ctx }
+        Self {
+            ctx: SessionContext::new(),
+        }
     }
 
-    pub async fn execute_sql(
-        &self,
-        sql: &str,
-    ) -> datafusion::error::Result<Vec<RecordBatch>> {
-        let df = self.ctx.sql(sql).await?;
-        df.collect().await
-    }
-
-    pub async fn register_parquet(
-        &self,
+    /// Register multiple parquet files as one logical table
+    pub async fn register_parquet_files(
+        &mut self,
         table_name: &str,
-        path: &str,
+        files: Vec<String>,
     ) -> datafusion::error::Result<()> {
         self.ctx
-            .register_parquet(table_name, path, ParquetReadOptions::default())
+            .register_parquet(table_name, &files, ParquetReadOptions::default())
             .await?;
         Ok(())
+    }
+
+    pub async fn query(&self, sql: &str) -> datafusion::error::Result<Vec<RecordBatch>> {
+        let df = self.ctx.sql(sql).await?;
+        df.collect().await
     }
 }
