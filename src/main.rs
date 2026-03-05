@@ -7,6 +7,7 @@ use engine::Engine;
 use worker::Worker;
 use iceberg::IcebergTable;
 use coordinator::Coordinator;
+use datafusion::arrow::util::pretty::print_batches;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -22,11 +23,19 @@ async fn main() -> anyhow::Result<()> {
     let files = iceberg.parquet_files()?;
 
     // Register all parquet files as one table
-    engine.register_parquet_files("example_table", files.clone()).await?;
+    engine.register_parquet_files(&iceberg.name, files.clone()).await?;
 
     // Query all data
-    let sql = "SELECT * FROM example_table LIMIT 5";
+    let sql = &format!("SELECT * FROM {}", iceberg.name);
     let batches = engine.query(sql).await?;
+
+    // Print query results to stdout
+    if !batches.is_empty() {
+        println!("Query results:");
+        print_batches(&batches)?;
+    } else {
+        println!("Query returned no rows");
+    }
 
     // Execute via worker/coordinator
     let worker = Worker::new("worker-1");
