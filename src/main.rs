@@ -2,6 +2,9 @@ mod engine;
 mod worker;
 mod iceberg;
 mod coordinator;
+mod connector;
+mod planner;
+mod task;
 
 use engine::Engine;
 use worker::Worker;
@@ -37,11 +40,38 @@ async fn main() -> anyhow::Result<()> {
         println!("Query returned no rows");
     }
 
-    // Execute via worker/coordinator
-    let worker = Worker::new("worker-1");
-    let coordinator = Coordinator::new(worker);
-
-    coordinator.execute_query(batches).await;
+    // Execute via worker/coordinator (distributed execution)
+    use std::sync::Arc;
+    use datafusion::prelude::*;
+    
+    let worker1 = Arc::new(Worker::new("worker-1"));
+    let worker2 = Arc::new(Worker::new("worker-2"));
+    let workers = vec![worker1, worker2];
+    
+    // Create a new context for coordinator (or share the engine's context)
+    let coordinator_ctx = SessionContext::new();
+    // Register the same table in coordinator's context
+    if let Some(first) = files.first() {
+        let path = std::path::Path::new(first);
+        let dir = if path.is_dir() {
+            path
+        } else {
+            path.parent().unwrap_or(path)
+        };
+        coordinator_ctx
+            .register_parquet(&iceberg.name, dir.to_string_lossy().as_ref(), ParquetReadOptions::default())
+            .await?;
+    }
+    
+    let coordinator = Coordinator::new(workers, coordinator_ctx);
+    
+    // Execute query through coordinator (distributed)
+    let distributed_batches: Vec<datafusion::arrow::record_batch::RecordBatch> = coordinator.execute_query(sql).await?;
+    
+    if !distributed_batches.is_empty() {
+        println!("\nDistributed query results:");
+        print_batches(&distributed_batches)?;
+    }
 
     Ok(())
 }
